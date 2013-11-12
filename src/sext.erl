@@ -1,3 +1,18 @@
+%%==============================================================================
+%% Copyright 2010 Erlang Solutions Ltd.
+%%
+%% Licensed under the Apache License, Version 2.0 (the "License");
+%% you may not use this file except in compliance with the License.
+%% You may obtain a copy of the License at
+%%
+%% http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing, software
+%% distributed under the License is distributed on an "AS IS" BASIS,
+%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+%% See the License for the specific language governing permissions and
+%% limitations under the License.
+%%==============================================================================
 %%
 %% @author Ulf Wiger <ulf.wiger@erlang-solutions.com>
 %% @doc Sortable serialization library
@@ -14,8 +29,7 @@
 -export([prefix_sb32/1]).
 -export([to_sb32/1, from_sb32/1]).
 -export([to_hex/1, from_hex/1]).
--export([encode_binary/1]).
--export([nif_mode/0, fake/2]).
+-export([nif_mode/0]).
 
 -define(negbig   , 8).
 -define(neg4     , 9).
@@ -57,19 +71,26 @@
 
 %%-define(dbg(F,A),no_debug).
 
+-define(SO_FNAME, "sext").
+-define(SO_DEFAULT_PATH, "../priv").
+
 %% @doc load nifs
 nif_mode() ->
     SoName = case code:priv_dir(?MODULE) of
                  {error, bad_name} ->
                      case code:which(?MODULE) of
                          Filename when is_list(Filename) ->
-                             filename:join([filename:dirname(Filename),"../priv", "sext_drv"]);
+
+                             filename:join([filename:dirname(Filename), ?SO_DEFAULT_PATH, ?SO_FNAME]);
                          _ ->
-                             filename:join("../priv", "sext_drv")
+                             filename:join(?SO_DEFAULT_PATH, ?SO_FNAME)
                      end;
                  Dir ->
-                     filename:join(Dir, "sext_drv")
+                     io:format("#1 Looking in ~s", [Dir]),
+                     filename:join(Dir, ?SO_FNAME)
              end,
+    
+                     io:format("Loading from ~s", [SoName]),
     erlang:load_nif(SoName, 0).
 
 %% @spec encode(T::term()) -> binary()
@@ -626,8 +647,6 @@ is_wild(_) ->
 encode_bin_elems(<<>>) ->
     <<8>>;
 encode_bin_elems(B) ->
-    %% Pad = 8 - (size(B) rem 8),
-    %% << (<< <<1:1, B1:8>> || <<B1>> <= B >>)/bitstring, 0:Pad, 8 >>.
     encode_bin_elems(B, <<>>).
 
 encode_bin_elems(<<B:1024/bytes, Rest/binary>>, Acc) ->
@@ -637,9 +656,6 @@ encode_bin_elems(B, Acc) ->
     Enc = encode_bin_elems_int(B, 1),
     <<Acc/binary, Enc/binary>>.
 
-fake(B,E) ->
-    encode_bin_elems_int(B,E).
-    
 encode_bin_elems_int(_B, _End) ->
     error(nif_not_loaded).
 
@@ -724,7 +740,7 @@ decode_next(<<?posbig, Rest/binary>>) -> decode_pos_big(Rest);
 decode_next(<<?neg4, I:31, F:1, Rest/binary>>) -> decode_neg(I,F,Rest);
 decode_next(<<?pos4, I:31, F:1, Rest/binary>>) -> decode_pos(I,F,Rest);
 %% decode_next(<<?old_binary, Rest/binary>>) -> decode_binary(Rest);
-decode_next(<<?binary, Rest/binary>>) -> decode_binary2(Rest).
+decode_next(<<?binary, Rest/binary>>) -> decode_binary_maybe_nif(Rest).
 
 -spec partial_decode(binary()) -> {full | partial, any(), binary()}.
 %% @spec partial_decode(Bytes) -> {full | partial, DecodedTerm, Rest}
@@ -997,8 +1013,8 @@ strip_one(<<1:1, Rest/bitstring>>) -> Rest.
 decode_binary(<<8, Rest/binary>>) ->  {<<>>, Rest};
 decode_binary(B)     ->  decode_binary(B, 0, <<>>).
 
-decode_binary2(<<8, Rest/binary>>) ->  {<<>>, Rest};
-decode_binary2(B)     ->  
+decode_binary_maybe_nif(<<8, Rest/binary>>) ->  {<<>>, Rest};
+decode_binary_maybe_nif(B)     ->  
     case decode_binary_nif(B) of
         fallback -> decode_binary(B, 0, <<>>);
         Other -> Other
