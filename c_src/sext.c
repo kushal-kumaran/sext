@@ -43,6 +43,8 @@
 #define SEXT_MAX_INT_31 ((uint32_t)0x7fffFFFF)
 #define BYTE_HIGH_BIT ((unsigned char)0x80)
 
+#define BIT(N) (1<<(N))
+
 // If defined, tries some fancy optimizations. So far I have not seen
 // huge improvements with -O3, but about 5-10% ain't bad.
 #define HAND_ROLLED
@@ -92,15 +94,15 @@ static size_t count_binary_bytes(ErlNifBinary *bin, size_t ofs)
     while (available > 8) {
         const unsigned char * b = bin->data + ofs;
         const unsigned char mask =
-            (b[0] >> 7) | (b[1] >> 5 & 2) | (b[2] >> 3 & 4) |
-            (b[3] >> 1 & 8) | (b[4] << 1 & 16) | (b[5] << 3 & 32) |
-            (b[6] << 5 & 64) | (b[7] << 7 & 128);
+            (b[0] >> 7) | (b[1] >> 5 & BIT(1)) | (b[2] >> 3 & BIT(2)) |
+            (b[3] >> 1 & BIT(3)) | (b[4] << 1 & BIT(4)) | (b[5] << 3 & BIT(5)) |
+            (b[6] << 5 & BIT(6)) | (b[7] << 7 & BIT(7));
 
         // Not all 8 bits set, so end is here. Skip to normal loop.
         if (mask != (unsigned char)0xff) {
             break;
         }
-        available -= 8;
+        available -= 9;
         n += 8;
         ofs += 9;
     }
@@ -117,8 +119,8 @@ static size_t count_binary_bytes(ErlNifBinary *bin, size_t ofs)
             bit_ofs &= 7;
         } else { // zero bit marks end sequence
             // Fail if not padded with zeros, followed by an 8 byte.
-            unsigned char tailMask = 0xffu >> bit_ofs;
-            if ((tailMask & bin->data[ofs])) {
+            unsigned char tail_mask = 0xffu >> bit_ofs;
+            if ((tail_mask & bin->data[ofs])) {
                 return SIZE_ERROR;
             }
             if (bin->data[ofs+1] != 8) {
@@ -136,6 +138,10 @@ static size_t count_binary_bytes(ErlNifBinary *bin, size_t ofs)
 static void decode_binary_bytes(ErlNifBinary *bin, size_t * ofs_ptr,
         unsigned char * data, size_t size)
 {
+    if (size == 0) {
+        ++(*ofs_ptr);
+        return;
+    }
     size_t ofs = *ofs_ptr; // byte offset
     size_t i = 0;
 #ifdef HAND_ROLLED
@@ -530,88 +536,64 @@ sext_decode_binary(ErlNifEnv * env, int argc, const ERL_NIF_TERM argv[])
     return enif_make_badarg(env);
 }
 
-static ERL_NIF_TERM encode_bin_elems_int(ErlNifEnv* env, int argc,
+
+static ERL_NIF_TERM encode_bin_elems_nif(ErlNifEnv* env, int argc,
                                          const ERL_NIF_TERM argv[]) {
 
-    ErlNifBinary bin, out;
+    ErlNifBinary bin, bin_out;
     uint32_t end;
 
     if( enif_inspect_binary(env, argv[0], &bin) &&
         enif_get_uint(env, argv[1], &end) ) {
 
-        // make the new size.  This pads out <<>> to 1 byte, which is inadvertently
-        // the right thing to do, since we need to return <<"8">>
-        int new_bit_size = bin.size * 9;
-        int pad_size = 0;
-        if( end == 1 ) {
-            pad_size = 8 - (new_bit_size % 8);
-            if( pad_size == 8 && bin.size != 0) {
-                pad_size = 16;
-            }
-        }
-        //add one here for additional padding since we always end on a byte boundary
-        int new_byte_size = ((new_bit_size+pad_size)/8);
-        if( (new_bit_size % 8) != 0 ) {
-            new_byte_size += 1;
+        size_t new_bin_size = (bin.size * 9) / 8 + (end ? 2 : 0);
+
+        if (!enif_alloc_binary(new_bin_size, &bin_out)) {
+            return enif_make_badarg(env);
         }
 
-        if (!enif_alloc_binary(new_byte_size, &out)) {
-            return enif_make_tuple2(env,
-                                    enif_make_atom(env, "error"),
-                                    enif_make_atom(env, "allocation_error"));
+        size_t rem;
+        unsigned char *in, *out;
+        for (rem = bin.size, out = bin_out.data, in = bin.data;
+                rem > 8;
+                rem -= 8, in += 8, out += 9) {
+            out[0] =              BIT(7) | in[0] >> 1;
+            out[1] = in[0] << 7 | BIT(6) | in[1] >> 2;
+            out[2] = in[1] << 6 | BIT(5) | in[2] >> 3;
+            out[3] = in[2] << 5 | BIT(4) | in[3] >> 4;
+            out[4] = in[3] << 4 | BIT(3) | in[4] >> 5;
+            out[5] = in[4] << 3 | BIT(2) | in[5] >> 6;
+            out[6] = in[5] << 2 | BIT(1) | in[6] >> 7;
+            out[7] = in[6] << 1 | BIT(0) ;
+            out[8] = in[7];
         }
 
-        if (bin.size == 0) {
-            if( end == 1 ) {
-                out.data[0] = 8;
+        if (rem > 0) {
+            unsigned char marker_bit = BIT(7);
+            *out++ = BIT(7) | (*in) >> 1;
+            int s1 = 7, s2 = 2;
+            unsigned char * in2 = in + 1;
+            for(--rem, marker_bit >>= 1; rem > 0; --rem, marker_bit >>= 1, --s1, ++s2) {
+                *out++ = *in++ << s1 | marker_bit | *in2++ >> s2;
             }
-        } else {
-            int i,
-                // out_pos is in *bits*, not bytes
-                out_pos = 0;
-            uint8_t next = 0;
-
-            memset(out.data, 0, new_byte_size);
-            if( end == 1 ) {
-                out.data[new_byte_size-1] = 8;
-            }
-
-            for(i = 0; i <= bin.size; i++) {
-                if( i != bin.size) {
-                    uint8_t payload = bin.data[i],
-                                 wr = 0;
-                    // the byte that we're operating on.
-                    int cursor = out_pos / 8,
-                                 //the offset in the byte
-                         shift = (out_pos % 8) + 1;
-                    //or in our leftovers from the last byte
-                    out.data[cursor] |= next;
-                    //1:1
-                    out.data[cursor] |= 1 << (8 - shift);
-                    if( out_pos != 0 && shift == 8 ) {
-                        out.data[cursor+1] |= payload;
-                        next = 0;
-                    } else {
-                        wr = payload >> shift;
-                        out.data[cursor] |= wr;
-                        next = payload << (8 - shift);
-                    }
-                    out_pos += 9;
-                } else {
-                    out.data[(out_pos/8)] |= next;
-                }
-            }
+            *out++ = *in << s1;
         }
-        return enif_make_binary(env, &out);
+
+        if (end) {
+            if ((bin.size % 8) == 0) {
+                *out++ = 0;
+            }
+            *out = 8;
+        }
+        return enif_make_binary(env, &bin_out);
     } else {
-        // return an error here
         return enif_make_badarg(env);
     }
 }
 
 static ErlNifFunc nif_funcs[] =
 {
-    {"encode_bin_elems_int", 2, encode_bin_elems_int},
+    {"encode_bin_elems_nif", 2, encode_bin_elems_nif},
     {"decode_binary_nif", 1, sext_decode_binary},
     {"decode_nif", 1, sext_decode}
 };

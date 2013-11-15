@@ -86,11 +86,8 @@ nif_mode() ->
                              filename:join(?SO_DEFAULT_PATH, ?SO_FNAME)
                      end;
                  Dir ->
-                     io:format("#1 Looking in ~s", [Dir]),
                      filename:join(Dir, ?SO_FNAME)
              end,
-    
-                     io:format("Loading from ~s", [SoName]),
     erlang:load_nif(SoName, 0).
 
 %% @spec encode(T::term()) -> binary()
@@ -650,13 +647,13 @@ encode_bin_elems(B) ->
     encode_bin_elems(B, <<>>).
 
 encode_bin_elems(<<B:1024/bytes, Rest/binary>>, Acc) ->
-    Enc = encode_bin_elems_int(B, 0),
+    Enc = encode_bin_elems_nif(B, 0),
     encode_bin_elems(Rest, <<Acc/binary, Enc/binary>>);
 encode_bin_elems(B, Acc) ->
-    Enc = encode_bin_elems_int(B, 1),
+    Enc = encode_bin_elems_nif(B, 1),
     <<Acc/binary, Enc/binary>>.
 
-encode_bin_elems_int(_B, _End) ->
+encode_bin_elems_nif(_B, _End) ->
     error(nif_not_loaded).
 
 encode_neg_bits(<<>>) ->
