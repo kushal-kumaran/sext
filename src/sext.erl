@@ -31,6 +31,10 @@
 -export([to_hex/1, from_hex/1]).
 -export([nif_mode/0]).
 
+-ifdef(TEST).
+-export([encode_bin_elems/1, encode_bin_elems_erlang/1]).
+-endif.
+
 -define(negbig   , 8).
 -define(neg4     , 9).
 -define(pos4     , 10).
@@ -1178,6 +1182,13 @@ hex2nib(C) when $A =< C, C =< $F -> C - $A + 10.
 
 -ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
+
+%% Pre-NIF version of encode_bin_elems for comparison
+encode_bin_elems_erlang(<<>>) ->
+    <<8>>;
+encode_bin_elems_erlang(B) ->
+    Pad = 8 - (size(B) rem 8),
+    << (<< <<1:1, B1:8>> || <<B1>> <= B >>)/bitstring, 0:Pad, 8 >>.
 
 encode_test() ->
     L = test_list(),
