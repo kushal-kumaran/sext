@@ -258,7 +258,7 @@ static enum DecodeResult decode_binary(ErlNifEnv* env, ErlNifBinary * bin,
 
 #define MAX_BIN_INT_LEN (10)
 
-// Sets the decode_in_erlang flag if the int is too large to handle in a NIF.
+// Returns DECODE_UNSUPPORTED if the int is too large to handle in a NIF.
 // There are no functions to handle Erlang really big ints in C land.
 static enum DecodeResult decode_posbig(ErlNifEnv * env, ErlNifBinary * bin,
         size_t * ofs_ptr, ERL_NIF_TERM * term_out)
@@ -319,7 +319,8 @@ static enum DecodeResult decode_posbig(ErlNifEnv * env, ErlNifBinary * bin,
     *term_out = enif_make_uint64(env, val);
     return DECODE_OK;
 }
-// Sets the decode_in_erlang flag if the int is too large to handle in a NIF.
+
+// Returns DECODE_UNSUPPORTED if the int is too large to handle in a NIF.
 // There are no functions to handle Erlang really big ints in C land.
 static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
         size_t * ofs_ptr, ERL_NIF_TERM * term_out)
@@ -537,7 +538,7 @@ sext_decode_binary(ErlNifEnv * env, int argc, const ERL_NIF_TERM argv[])
 }
 
 
-static ERL_NIF_TERM encode_bin_elems_nif(ErlNifEnv* env, int argc,
+static ERL_NIF_TERM sext_encode_bin_elems(ErlNifEnv* env, int argc,
                                          const ERL_NIF_TERM argv[]) {
 
     ErlNifBinary bin, bin_out;
@@ -593,7 +594,7 @@ static ERL_NIF_TERM encode_bin_elems_nif(ErlNifEnv* env, int argc,
 
 static ErlNifFunc nif_funcs[] =
 {
-    {"encode_bin_elems_nif", 2, encode_bin_elems_nif},
+    {"encode_bin_elems_nif", 2, sext_encode_bin_elems},
     {"decode_binary_nif", 1, sext_decode_binary},
     {"decode_nif", 1, sext_decode}
 };
