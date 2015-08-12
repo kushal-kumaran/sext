@@ -322,6 +322,7 @@ static enum DecodeResult decode_posbig(ErlNifEnv * env, ErlNifBinary * bin,
 
 // Returns DECODE_UNSUPPORTED if the int is too large to handle in a NIF.
 // There are no functions to handle Erlang really big ints in C land.
+// This decodes values encoded by sext:encode_big_neg/1.
 static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
         size_t * ofs_ptr, ERL_NIF_TERM * term_out)
 {
@@ -332,20 +333,23 @@ static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
 
     uint32_t words = ((uint32_t)-1) - to_uint_32(bin->data+*ofs_ptr);
     *ofs_ptr += 4;
-    uint64_t ceil;
 
     switch(words) {
         case 0:
             return DECODE_INVALID;
         case 1:
-            ceil = ((uint64_t)-1);
             break;
         default:
             return DECODE_UNSUPPORTED;
     }
 
+    const uint64_t ceil = ((uint64_t)-1);
     size_t bin_size = count_binary_bytes(bin, *ofs_ptr);
-    if ((bin_size == SIZE_ERROR) || (bin_size > words * 8)) {
+    // Int encoded as binary should be at most 8 bytes (64 bit value since
+    // we only support 1 word) plus an extra byte since the encoding function
+    // that turns the integer into bytes (sext:encode_big1/2) throws an extra
+    // zero at the front.
+    if (bin_size > 9) {
         return DECODE_INVALID;
     }
 
@@ -354,6 +358,11 @@ static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
 
     decode_binary_bytes(bin, ofs_ptr, buf, bin_size);
 
+    // If the bin size is 9, that first byte better be a zero
+    if (bin_size == 9 && buf[0] != 0) {
+        return DECODE_INVALID;
+    }
+
     unsigned char * int_bytes = buf;
     uint64_t val = 0;
 
@@ -361,6 +370,7 @@ static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
         val = (val << 8) | *int_bytes++;
     }
 
+    // The trailing byte indicates if this is part of a float
     unsigned char fbyte = bin->data[*ofs_ptr];
 
     if (fbyte == 0) { // float
@@ -370,9 +380,18 @@ static enum DecodeResult decode_negbig(ErlNifEnv * env, ErlNifBinary * bin,
     if (fbyte != 0xff) {
         return DECODE_INVALID;
     }
+    // val is now the complement of the magnitude of the negative number,
+    // and ceil is the maximum unsigned 64 bit value.
+    // So it could be something like -2^64, which is too big for a signed
+    // 64 bit value. If it overflows, fall back to Erlang decoding.
+    int64_t magnitude = (int64_t)(ceil - val);
+
+    if (magnitude < 0) {
+        return DECODE_UNSUPPORTED;
+    }
 
     ++(*ofs_ptr);
-    *term_out = enif_make_int64(env, -((int64_t)ceil - val));
+    *term_out = enif_make_int64(env, -magnitude);
     return DECODE_OK;
 }
 
