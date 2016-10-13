@@ -24,19 +24,22 @@
 
 DIRS=src 
 
-all: compile
+all: deps compile
 
 compile:
 	./rebar compile
 
+deps:
+	./rebar get-deps
 
 clean:
 	./rebar clean
 
-eunit:
+eunit: compile
 	./rebar eunit
 
 test: eunit
 
 doc:
 	./rebar doc
+
