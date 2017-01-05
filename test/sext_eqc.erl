@@ -49,11 +49,11 @@ sext_test_() ->
       fun() -> t(run(N, prop_encode, fun prop_encode/0)) end
       , fun() -> t(run(N, prop_encode_nif, fun prop_encode_nif/0)) end
       , fun() -> t(run(N, prop_decode_legacy_big, fun prop_decode_legacy_big/0)) end
-      , fun() -> t(run(N, prop_decode_legacy_neg_big, fun prop_decode_legacy_neg_big/0)) end
+      %% , fun() -> t(run(N, prop_decode_legacy_neg_big, fun prop_decode_legacy_neg_big/0)) end
       , fun() -> t(run(N, prop_prefix_equiv,fun prop_prefix_equiv/0))end
       , fun() -> t(run(N, prop_sort, fun prop_sort/0)) end
-      , fun() -> t(run(N, prop_sort_big, fun prop_sort_big/0)) end
-      , fun() -> t(run(N, prop_sort_neg_big, fun prop_sort_neg_big/0)) end
+      %% , fun() -> t(run(N, prop_sort_big, fun prop_sort_big/0)) end
+      %% , fun() -> t(run(N, prop_sort_neg_big, fun prop_sort_neg_big/0)) end
       , fun() -> t(run(N, prop_encode_sb32, fun prop_encode_sb32/0)) end
       , fun() -> t(run(N, prop_sort_sb32, fun prop_sort_sb32/0)) end
       , fun() -> t(run(N, prop_partial_decode1, fun prop_partial_decode1/0)) end
@@ -87,12 +87,12 @@ run(Num) ->
      run  (Num, prop_encode , fun prop_encode/0)
      , run(Num, prop_encode_nif , fun prop_encode_nif/0)
      , run(Num, prop_decode_legacy_big, fun prop_decode_legacy_big/0)
-     , run(Num, prop_decode_legacy_neg_big, fun prop_decode_legacy_neg_big/0)
+     %% , run(Num, prop_decode_legacy_neg_big, fun prop_decode_legacy_neg_big/0)
      , run(Num, prop_prefix_equiv,fun prop_prefix_equiv/0)
      %% , run(Num, prop_prefix_equiv,fun prop_prefix_equiv/0)
      , run(Num, prop_sort , fun prop_sort/0)
      , run(Num, prop_sort_big, fun prop_sort_big/0)
-     , run(Num, prop_sort_neg_big, fun prop_sort_neg_big/0)
+     %% , run(Num, prop_sort_neg_big, fun prop_sort_neg_big/0)
      , run(Num, prop_encode_sb32, fun prop_encode_sb32/0)
      , run(Num, prop_sort_sb32 , fun prop_sort_sb32/0)
      , run(Num, prop_partial_decode1, fun prop_partial_decode1/0)

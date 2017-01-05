@@ -533,12 +533,12 @@ int_to_binary(I) ->
 %% decode_size(<<0:1, H:7, T/binary>>) ->
 %%     {H, T}.
 
-encode_big_neg(I,Legacy) ->
+encode_big_neg(I,_Legacy) ->
     {Words, Max} = get_max(-I),
     ?dbg("Words = ~p | Max = ~p~n", [Words,Max]),
     Iadj = Max + I,             % keep in mind that I < 0
     ?dbg("IAdj = ~p~n", [Iadj]),
-    Bin = encode_big(Iadj,Legacy),
+    Bin = encode_bin_elems(list_to_binary(encode_big1(Iadj))),
     ?dbg("Bin = ~p~n", [Bin]),
     WordsAdj = 16#ffffFFFF - Words,
     ?dbg("WordsAdj = ~p~n", [WordsAdj]),
@@ -919,8 +919,9 @@ decode_neg_big(Bin) ->
     <<WordsAdj:32, Rest/binary>> = Bin,
     Words = 16#ffffFFFF - WordsAdj,
     ?dbg("Words = ~p~n", [Words]),
-    {Ib0, Rest1} = decode_binary(Rest),
-    Ib = remove_size_bits(Ib0),
+    %% {Ib0, Rest1} = decode_binary(Rest),
+    %% Ib = remove_size_bits(Ib0),
+    {Ib, Rest1} = decode_binary(Rest),
     ?dbg("Ib = ~p | Rest1 = ~p~n", [Ib, Rest1]),
     ISz = size(Ib) * 8,
     <<I0:ISz>> = Ib,
