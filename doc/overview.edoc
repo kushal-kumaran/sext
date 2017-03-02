@@ -221,7 +221,10 @@ whether a fraction part follows (1 if yes; 0 otherwise).
 
 <h3>2.5.3 Fraction part of positive numbers</h3>
 
-The representation of floating point numbers is based on the <a href="http://en.wikipedia.org/wiki/Double_precision_floating-point_format">IEEE 764 Binary 64 standard representation</a>. This is also the representation used by Erlang:
+The representation of floating point numbers is based on the
+<a href="http://en.wikipedia.org/wiki/Double_precision_floating-point_format"
+>IEEE 764 Binary 64 standard representation</a>.
+This is also the representation used by Erlang:
 
 <pre lang="erlang"><![CDATA[<<Sign:1, Exp:11, Frac:52>> = <<F/float>>]]></pre>
 

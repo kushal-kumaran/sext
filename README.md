@@ -71,11 +71,73 @@ Each data type is encoded using a type tag (1 byte) that represents its order
 in the global Erlang term ordering. The number type is divided into several
 subtypes, to facilitate a reasonably efficient representation:
 
-
-<table border="1"><tr align="left"><th>Type</th><th>Description</th><th>Tag</th></tr><tr><td>negbig</td><td>Negative bignum</td><td>8</td></tr><tr><td>neg4</td><td>Negative 31-bit integer</td><td>9</td></tr><tr><td>pos4</td><td>Positive 31-bit integer</td><td>10</td></tr><tr><td>posbig</td><td>Positive bignum</td><td>11</td></tr><tr><td>atom</td><td>Obj of type atom()</td><td>12</td></tr><tr><td>reference</td><td>Obj of type reference()</td><td>13</td></tr><tr><td>port</td><td>Obj of type port()</td><td>14</td></tr><tr><td>pid</td><td>Obj of type pid()</td><td>15</td></tr><tr><td>tuple</td><td>Obj of type tuple()</td><td>16</td></tr><tr><td>list</td><td>Obj of type list()</td><td>17</td></tr><tr><td>binary</td><td>Obj of type binary()</td><td>18</td></tr><tr><td>bin_tail</td><td>Improper-tail marker followed by binary or bitstring</td><td>19</td></tr>
+<table border="1">
+ <tr align="left">
+  <th>Type</th>
+  <th>Description</th>
+  <th>Tag</th>
+ </tr>
+ <tr>
+  <td>negbig</td>
+  <td>Negative bignum</td>
+  <td>8</td>
+ </tr>
+ <tr>
+  <td>neg4</td>
+  <td>Negative 31-bit integer</td>
+  <td>9</td>
+ </tr>
+ <tr>
+  <td>pos4</td>
+  <td>Positive 31-bit integer</td>
+  <td>10</td>
+ </tr>
+ <tr>
+  <td>posbig</td>
+  <td>Positive bignum</td>
+  <td>11</td>
+ </tr>
+ <tr>
+  <td>atom</td>
+  <td>Obj of type atom()</td>
+  <td>12</td>
+ </tr>
+ <tr>
+  <td>reference</td>
+  <td>Obj of type reference()</td>
+  <td>13</td>
+ </tr>
+ <tr>
+  <td>port</td>
+  <td>Obj of type port()</td>
+  <td>14</td>
+ </tr>
+ <tr>
+  <td>pid</td>
+  <td>Obj of type pid()</td>
+  <td>15</td>
+ </tr>
+ <tr>
+  <td>tuple</td>
+  <td>Obj of type tuple()</td>
+  <td>16</td>
+ </tr>
+ <tr>
+  <td>list</td>
+  <td>Obj of type list()</td>
+  <td>17</td>
+ </tr>
+ <tr>
+  <td>binary</td>
+  <td>Obj of type binary()</td>
+  <td>18</td>
+ </tr>
+ <tr>
+  <td>bin_tail</td>
+  <td>Improper-tail marker followed by binary or bitstring</td>
+  <td>19</td>
+ </tr>
 </table>
-
-
 
 ## 2.2 Tuples ##
 
@@ -288,10 +350,3 @@ encode_pid(P) ->
     <<?pid, NameEnc/binary, Rest/binary>>.
 ```
 
-
-
-## Modules ##
-
-
-<table width="100%" border="0" summary="list of modules">
-<tr><td><a href="http://github.com/uwiger/sext/blob/master/doc/sext.md" class="module">sext</a></td></tr></table>

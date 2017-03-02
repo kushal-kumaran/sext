@@ -1,25 +1,29 @@
-%% -*- erlang-indent-level: 4; indent-tabs-mode: nil
-%%==============================================================================
-%% Copyright 2014-16 Ulf Wiger
+%% -*- mode: erlang; erlang-indent-level: 4; indent-tabs-mode: nil -*-
+%% -------------------------------------------------------------------
 %%
-%% Licensed under the Apache License, Version 2.0 (the "License");
-%% you may not use this file except in compliance with the License.
-%% You may obtain a copy of the License at
+%% Copyright (c) 2013-2017 Basho Technologies, Inc.
+%% Copyright (c) 2009-2016 Ulf Wiger.
 %%
-%% http://www.apache.org/licenses/LICENSE-2.0
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
 %%
-%% Unless required by applicable law or agreed to in writing, software
-%% distributed under the License is distributed on an "AS IS" BASIS,
-%% WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-%% See the License for the specific language governing permissions and
-%% limitations under the License.
-%%==============================================================================
+%%   http://www.apache.org/licenses/LICENSE-2.0
 %%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% -------------------------------------------------------------------
+
 %% @author Ulf Wiger <ulf@wiger.net>
 %% @doc Sortable serialization library
 %% @end
 -module(sext).
--on_load(nif_mode/0).
 
 -export([encode/1, encode/2, decode/1, decode_next/1]).
 -export([encode_hex/1, decode_hex/1]).
@@ -30,12 +34,21 @@
 -export([prefix_sb32/1]).
 -export([to_sb32/1, from_sb32/1]).
 -export([to_hex/1, from_hex/1]).
--export([nif_mode/0]).
 
+-export([pp/1]).  % for debugging only
 -ifdef(TEST).
 -export([encode_bin_elems/1, encode_bin_elems_erlang/1]).
+-include_lib("eunit/include/eunit.hrl").
 -endif.
--export([pp/1]).  % for debugging only
+
+-ifdef(BASHO_CHECK).
+%% Dialyzer and XRef won't recognize 'on_load' as using the function and
+%% will complain about it.
+-export([init_nif_lib/0]).
+-endif.
+-on_load(init_nif_lib/0).
+
+-define(APPLICATION, sext).
 
 -define(negbig   , 8).
 -define(neg4     , 9).
@@ -73,25 +86,6 @@
         end).
 
 %%-define(dbg(F,A),no_debug).
-
--define(SO_FNAME, "sext").
--define(SO_DEFAULT_PATH, "../priv").
-
-%% @doc load nifs
-nif_mode() ->
-    SoName = case code:priv_dir(?MODULE) of
-                 {error, bad_name} ->
-                     case code:which(?MODULE) of
-                         Filename when is_list(Filename) ->
-
-                             filename:join([filename:dirname(Filename), ?SO_DEFAULT_PATH, ?SO_FNAME]);
-                         _ ->
-                             filename:join(?SO_DEFAULT_PATH, ?SO_FNAME)
-                     end;
-                 Dir ->
-                     filename:join(Dir, ?SO_FNAME)
-             end,
-    erlang:load_nif(SoName, 0).
 
 %% @spec encode(T::term()) -> binary()
 %% @doc Encodes any Erlang term into a binary.
@@ -617,7 +611,7 @@ encode_bin_elems(B, Acc) ->
     <<Acc/binary, Enc/binary>>.
 
 encode_bin_elems_nif(_B, _End) ->
-    error(nif_not_loaded).
+    erlang:nif_error(nif_not_loaded).
 
 encode_neg_bits(<<>>) ->
     <<247>>;
@@ -705,14 +699,14 @@ decode_next(<<?binary, Rest/binary>>) -> decode_binary_maybe_nif(Rest).
 %%
 %% Example:
 %% ```
-%% 1&gt; T = sext:encode({a,b,c}).
-%% &lt;&lt;16,0,0,0,3,12,176,128,8,12,177,0,8,12,177,128,8&gt;&gt;
-%% 2&gt; sext:partial_decode(&lt;&lt;T/binary, "tail"&gt;&gt;).
-%% {full,{a,b,c},&lt;&lt;"tail"&gt;&gt;}
-%% 3&gt; P = sext:prefix({a,b,'_'}).
-%% &lt;&lt;16,0,0,0,3,12,176,128,8,12,177,0,8&gt;&gt;
-%% 4&gt; sext:partial_decode(&lt;&lt;P/binary, "tail"&gt;&gt;).
-%% {partial,{a,b,'_'},&lt;&lt;"tail"&gt;&gt;}
+%% 1> T = sext:encode({a,b,c}).
+%% <<16,0,0,0,3,12,176,128,8,12,177,0,8,12,177,128,8>>
+%% 2> sext:partial_decode(<<T/binary, "tail">>).
+%% {full,{a,b,c},<<"tail">>}
+%% 3> P = sext:prefix({a,b,'_'}).
+%% <<16,0,0,0,3,12,176,128,8,12,177,0,8>>
+%% 4> sext:partial_decode(<<P/binary, "tail">>).
+%% {partial,{a,b,'_'},<<"tail">>}
 %% '''
 %%
 %% Note that a decoded prefix may not be exactly like the encoded prefix.
@@ -955,17 +949,17 @@ decode_binary(<<8, Rest/binary>>) ->  {<<>>, Rest};
 decode_binary(B)     ->  decode_binary(B, 0, <<>>).
 
 decode_binary_maybe_nif(<<8, Rest/binary>>) ->  {<<>>, Rest};
-decode_binary_maybe_nif(B)     ->  
+decode_binary_maybe_nif(B)     ->
     case decode_binary_nif(B) of
         fallback -> decode_binary(B, 0, <<>>);
         Other -> Other
     end.
 
 decode_binary_nif(_Bin) ->
-    error(nif_not_loaded).
+    erlang:nif_error(nif_not_loaded).
 
 decode_nif(_Bin) ->
-    error(nif_not_loaded).
+    erlang:nif_error(nif_not_loaded).
 
 decode_binary(<<1:1,H:8,Rest/bitstring>>, N, Acc) ->
     case Rest of
@@ -1107,8 +1101,33 @@ nib2hex(N) when 10 =< N, N =< 15-> $A + N - 10.
 hex2nib(C) when $0 =< C, C =< $9 -> C - $0;
 hex2nib(C) when $A =< C, C =< $F -> C - $A + 10.
 
+%% ===================================================================
+%% NIF initialization
+%% ===================================================================
+
+init_nif_lib() ->
+    SoDir = case code:priv_dir(?APPLICATION) of
+        {error, bad_name} ->
+            ADir = case code:which(?MODULE) of
+                Beam when is_list(Beam) ->
+                    filename:dirname(filename:dirname(Beam));
+                _ ->
+                    {ok, CWD} = file:get_cwd(),
+                    % This is almost certainly wrong, but it'll end
+                    % up equivalent to "../priv".
+                    filename:dirname(CWD)
+            end,
+            filename:join(ADir, "priv");
+        PDir ->
+            PDir
+    end,
+    AppEnv = application:get_all_env(?APPLICATION),
+    erlang:load_nif(filename:join(SoDir, ?APPLICATION), AppEnv).
+
+%% ===================================================================
+%% Tests
+%% ===================================================================
 -ifdef(TEST).
--include_lib("eunit/include/eunit.hrl").
 
 %% Pre-NIF version of encode_bin_elems for comparison
 encode_bin_elems_erlang(<<>>) ->
